@@ -1,6 +1,6 @@
 import itertools
 import random
-
+import copy
 
 class Minesweeper():
     """
@@ -102,22 +102,24 @@ class Sentence():
         return f"{self.cells} = {self.count}"
 
     def known_mines(self):
+
+
+        if len(self.cells)==self.count:
+            return self.cells
+        else:
+            return set()
         """
         Returns the set of all cells in self.cells known to be mines.
         """
-        if len(self.cells) == self.count:  # all nearby cells are mines
+    def known_safes(self):
+
+        if self.count==0:
             return self.cells
         else:
             return set()
-
-    def known_safes(self):
         """
         Returns the set of all cells in self.cells known to be safe.
         """
-        if self.count == 0:  # no nearby cells are mines
-            return self.cells
-        else:
-            return set()
 
     def mark_mine(self, cell):
         """
@@ -125,8 +127,8 @@ class Sentence():
         a cell is known to be a mine.
         """
         if cell in self.cells:
-            self.cells.remove(cell)
-            self.count -= 1
+            self.cells.discard(cell)
+            self.count-=1
 
     def mark_safe(self, cell):
         """
@@ -134,8 +136,7 @@ class Sentence():
         a cell is known to be safe.
         """
         if cell in self.cells:
-            self.cells.remove(cell)
-
+            self.cells.discard(cell)
 
 class MinesweeperAI():
     """
@@ -191,62 +192,43 @@ class MinesweeperAI():
             5) add any new sentences to the AI's knowledge base
                if they can be inferred from existing knowledge
         """
-
         self.moves_made.add(cell)
-        self.mark_safe(cell)
+        self.safes.add(cell)
+        cells={(cell[0],cell[1]-1),(cell[0],cell[1]+1),(cell[0]+1,cell[1]),(cell[0]-1,cell[1]),(cell[0]+1,cell[1]+1),(cell[0]-1,cell[1]-1),(cell[0]+1,cell[1]-1),(cell[0]-1,cell[1]+1)}
+        board=set()
+        for i in range(self.height):
+            for j in range(self.width):
+                board.add((i,j))
+        cells=cells.intersection(board)
+        cells=cells.difference(self.moves_made)
+        self.knowledge.append(Sentence(cells=cells,count=count))
+        while True:
+            knowledgecopy=copy.deepcopy(self.knowledge)
+            for sentence in knowledgecopy:
+                safe=sentence.known_safes()
+                mine=sentence.known_mines()
+                if len(safe):
+                    self.safes.update(safe)
+                    self.knowledge.remove(sentence)
+                if len(mine):
+                    self.mines.update(mine)
+                    self.knowledge.remove(sentence)
 
-        # we now need the neighbouring cells for this cell
-        # also we need to check if any of the neighbours are active mines
-        # if they are then we need not add them to neighbour and reduce the cell
-        # value by known neighbour mines.
+            for s in self.safes:
+                self.mark_safe(s)
+            for m in self.mines:
+                self.mark_mine(m)
+            knowledgecopy1=copy.deepcopy(self.knowledge)
+            for info1 in knowledgecopy1:
+                for info2 in knowledgecopy1:
+                    newcells= info2.cells.difference(info1.cells)
+                    newsentence=Sentence(cells=newcells,count=(info2.count-info1.count))
+                    if not(info2 == info1) and info1.cells.issubset(info2.cells) and (newsentence not in self.knowledge):
+                        self.knowledge.append(newsentence)
+            if(knowledgecopy==self.knowledge):
+                break
 
-        neighbour_cells = set()
-        known_neighbour_mines = 0
 
-        cell_x, cell_y = cell
-
-        for i in range(cell_x - 1, cell_x + 2):
-            for j in range(cell_y - 1, cell_y + 2):
-                if (i, j) in self.mines:
-                    known_neighbour_mines += 1
-                else:
-                    if (
-                            0 <= i < self.height
-                            and 0 <= j < self.width
-                            and (i, j) != cell
-                            and (i, j) not in self.safes
-                    ):
-                        neighbour_cells.add((i, j))
-
-        # the new sentence will be { cells in neighbours } = count - known_neighbour_mines.
-        self.knowledge.append(Sentence(neighbour_cells, count - known_neighbour_mines))
-
-        # now we have made the move, and we need to update knowledge base
-        # now our played move is safe , but what if it was a part of sentence where cells was
-        # just one greater than the count , thus when it is marked safe our sentence now can give known mines
-        # similarly if count becomes 0 then all safe mines.
-
-        for sentence in self.knowledge:
-            if sentence.known_mines():
-                for cell in sentence.known_mines().copy():
-                    self.mark_mine(cell)
-            if sentence.known_safes():
-                for cell in sentence.known_safes().copy():
-                    self.mark_safe(cell)
-
-        # now we need to check the subset case , where sentence is a subset of our new_sentence
-
-        for sentence in self.knowledge:
-            if (
-                    sentence.cells != neighbour_cells
-                    and sentence.count > 0
-                    and sentence.cells < neighbour_cells
-            ):
-                left_cells = neighbour_cells.symmetric_difference(sentence.cells)
-                # we are left with the cells now that are not common to both and thus
-                # a new sentence that tells us that by how much the count reduces when common
-                # cells are reduced.
-                self.knowledge.append(Sentence(left_cells, abs(count - sentence.count)))
 
     def make_safe_move(self):
         """
@@ -269,10 +251,8 @@ class MinesweeperAI():
             1) have not already been chosen, and
             2) are not known to be mines
         """
-        random_choices = []
-        for x in range(self.height):
-            for y in range(self.width):
-                if (x, y) not in self.mines and (x, y) not in self.moves_made:
-                    random_choices.append((x, y))
-
-        return random.choice(random_choices) if len(random_choices) > 0 else None
+        for i in range(self.height):
+            for j in range(self.width):
+                if((i,j) not in self.moves_made)and((i,j)not in self.mines):
+                    return (i,j)
+        return None
