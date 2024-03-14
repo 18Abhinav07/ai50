@@ -125,7 +125,7 @@ def minimax(board):
     Returns the optimal action for the current player on the board.
     """
 
-    def max_value(temp_board):
+    def max_value(temp_board, alpha, beta):
         best_move = None
 
         if terminal(temp_board):
@@ -134,16 +134,19 @@ def minimax(board):
         max_value_obtained = -math.inf
 
         for action in actions(temp_board):
-            action_score = min_value(result(temp_board, action))
+            action_score = min_value(result(temp_board, action), alpha, beta)
             if action_score[0] > max_value_obtained:
                 max_value_obtained = action_score[0]
                 best_move = action
+                alpha = max(alpha, max_value_obtained)
                 if max_value_obtained == 1:
                     break
+                if alpha >= beta:
+                    break  # Prune
 
         return max_value_obtained, best_move
 
-    def min_value(temp_board):
+    def min_value(temp_board, alpha, beta):
         best_move = None
 
         if terminal(temp_board):
@@ -152,19 +155,24 @@ def minimax(board):
         min_value_obtained = math.inf
 
         for action in actions(temp_board):
-            action_score = max_value(result(temp_board, action))
+            action_score = max_value(result(temp_board, action), alpha, beta)
             if action_score[0] < min_value_obtained:
                 min_value_obtained = action_score[0]
                 best_move = action
+                beta = min(beta, min_value_obtained)
                 if min_value_obtained == -1:
                     break
+                if alpha >= beta:
+                    break  # Prune
 
         return min_value_obtained, best_move
 
     current_player = player(board)
+    alpha = -math.inf
+    beta = math.inf
 
     if current_player == X:
-        score, bestMove = max_value(board)
+        score, bestMove = max_value(board, alpha, beta)
     else:
-        score, bestMove = min_value(board)
+        score, bestMove = min_value(board, alpha, beta)
     return bestMove
